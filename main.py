@@ -6,8 +6,9 @@ from dash.dependencies import Input, Output, State
 import plotly.graph_objs as go
 from utils import make_period_time
 import pickle
-from sklearn.neighbors import KNeighborsRegressor
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
+
 # import dash_bootstrap_components as dbc
 
 # Loading model and scaler
@@ -36,12 +37,12 @@ custom_palette = [
 
 # Define the available options for year, month, and day
 YEARS = [str(year) for year in range(1405, 1396, -1)]
-MONTHES = [str(month).zfill(2) for month in range(1, 13)]
+MONTHS = [str(month).zfill(2) for month in range(1, 13)]
 DAYS = [str(day).zfill(2) for day in range(1, 32)]
 
 
 # create a function that takes 2 datetimes and make sales prediction between this 2 times.
-def predict_period_time(start_date: str, end_date: str, model: KNeighborsRegressor, scaler: StandardScaler):
+def predict_period_time(start_date: str, end_date: str, model: RandomForestRegressor, scaler: StandardScaler):
     """
     :param start_date: the start date that you want to predict in the `str` format for example: '1402-03-01'
     :param end_date: the end date that you want to predict in the `str` format for example: '1402-04-01'
@@ -84,45 +85,50 @@ app.layout = html.Div([
     html.Div([
         html.Label('Select Start Year'),
         dcc.Dropdown(id='start-year-dropdown', options=[{'label': year, 'value': year} for year in YEARS],
-                     value='1402'),
+                     value='1402', style={'background-color': 'rgba(221,235,241,0.7)'}),
     ], style={'display': 'inline-block', 'margin-right': '15px', 'margin-left': '20px'}),
 
     html.Div([
         html.Label('Start Month'),
-        dcc.Dropdown(id='start-month-dropdown', options=[{'label': month, 'value': month} for month in MONTHES],
-                     value='01'),
+        dcc.Dropdown(id='start-month-dropdown', options=[{'label': month, 'value': month} for month in MONTHS],
+                     value='01', style={'background-color': 'rgba(221,235,241,0.7)'}),
     ], style={'display': 'inline-block', 'margin-right': '15px'}),
 
     html.Div([
         html.Label('Start Day'),
-        dcc.Dropdown(id='start-day-dropdown', options=[{'label': day, 'value': day} for day in DAYS], value='01'),
+        dcc.Dropdown(id='start-day-dropdown', options=[{'label': day, 'value': day} for day in DAYS], value='01',
+                     style={'background-color': 'rgba(221,235,241,0.7)'}),
     ], style={'display': 'inline-block', 'margin-right': '30px'}),
 
     html.Div([
         html.Label('Select End Year'),
-        dcc.Dropdown(id='end-year-dropdown', options=[{'label': year, 'value': year} for year in YEARS], value='1402'),
+        dcc.Dropdown(id='end-year-dropdown', options=[{'label': year, 'value': year} for year in YEARS], value='1402'
+                     , style={'background-color': 'rgba(248,194,127,0.6)'}),
     ], style={'display': 'inline-block', 'margin-right': '15px'}),
 
     html.Div([
         html.Label('End Month'),
-        dcc.Dropdown(id='end-month-dropdown', options=[{'label': month, 'value': month} for month in MONTHES],
-                     value='02'),
+        dcc.Dropdown(id='end-month-dropdown', options=[{'label': month, 'value': month} for month in MONTHS],
+                     value='02', style={'background-color': 'rgba(248,194,127,0.6)'}),
     ], style={'display': 'inline-block', 'margin-right': '15px'}),
 
     html.Div([
         html.Label('End Day'),
-        dcc.Dropdown(id='end-day-dropdown', options=[{'label': day, 'value': day} for day in DAYS], value='01'),
+        dcc.Dropdown(id='end-day-dropdown', options=[{'label': day, 'value': day} for day in DAYS], value='01',
+                     style={'background-color': 'rgba(248,194,127,0.6)'}),
     ], style={'display': 'inline-block', 'margin-right': '30px'}),
 
     html.Div([
-        html.Button('Predict Sales', id='predict-button', n_clicks=0),
+        html.Button('Predict Sales', id='predict-button', n_clicks=0,
+                    style={'background-color': 'green', 'color': 'white'}),
     ], style={'display': 'inline-block', 'vertical-align': 'middle', 'margin-top': '55px'}),
 
     # # Spacer to push the Help button to the right
     # html.Div(style={'flex': 0.8}),
 
     html.Div([
-        html.Button('Help', id='help-button', n_clicks=0),
+        html.Button('Help', id='help-button', n_clicks=0,
+                    style={'background-color': 'rgb(13,152,186)', 'color': 'white'}),
     ], style={'display': 'inline-block', 'vertical-align': 'middle', 'margin-top': '55px', 'margin-right': '20px',
               'margin-left': '550px'}),
 
@@ -130,9 +136,9 @@ app.layout = html.Div([
         dcc.Graph(id='prediction-plot'), ], style={'margin-top': '20px'}),
 
     html.Div(id='help-modal', style={'display': 'none'}, children=[
-            html.Div([
-                html.H2("Dashboard Guide"),
-                dcc.Markdown("""
+        html.Div([
+            html.H4("Dashboard Guide"),
+            dcc.Markdown("""
                     This is a guide for using your dashboard.
     
                     1. Use the dropdowns to select start and end dates.
@@ -140,11 +146,14 @@ app.layout = html.Div([
                     3. Click on the "Help" button to close this guide.
     
                     Enjoy using the dashboard!
-                """),
+                """, style={'color': 'black', 'background-color': 'rgba(13,152,186, 0.3)', 'padding': '10px',
+                            'border-radius': '10px'}),
 
-            ], style={'position': 'fixed', 'top': '15%', 'left': '65%', 'transform': 'translate(-20%, -50%)'}),
-            html.Div(id='modal-background', style={'position': 'fixed', 'top': 0, 'left': 0, 'width': '100%', 'height': '80%', 'background-color': 'rgba(0, 0, 0, 0.5)', 'display': 'none'}),
-        ]),
+        ], style={'position': 'fixed', 'top': '15%', 'left': '65%', 'transform': 'translate(-23%, -50%)'}),
+        html.Div(id='modal-background',
+                 style={'position': 'fixed', 'top': 0, 'left': 0, 'width': '100%', 'height': '80%',
+                        'background-color': 'rgba(0, 0, 0, 0.2)', 'display': 'none'}),
+    ]),
 ])
 
 
@@ -174,7 +183,7 @@ def update_prediction_plot(n_clicks, start_year, start_month, start_day, end_yea
         fig = go.Figure(data=[go.Bar(x=LABELS, y=predictions, marker=dict(color=custom_palette))])
         fig.update_layout(
             height=600,
-            title="Sales Predictions of Bamland branch",
+            title="Sales Predictions of `Bamland` branch",
             title_font=dict(size=20),
             xaxis_title="Categories",
             xaxis_title_font=dict(size=16),
@@ -182,8 +191,8 @@ def update_prediction_plot(n_clicks, start_year, start_month, start_day, end_yea
             yaxis_title_font=dict(size=16),
             # font=dict(family="Arial", size=18, color="black"),
             paper_bgcolor="white",
-            plot_bgcolor="white",
-            xaxis=dict(tickangle=45, tickfont=dict(size=15)),
+            plot_bgcolor="rgba(221,235,241,0.7)",
+            xaxis=dict(tickangle=45, tickfont=dict(size=15), gridcolor='white'),
         )
         # Change the theme to "plotly_dark"
         # fig.update_layout(template="plotly_dark") # for changing the background of plot
