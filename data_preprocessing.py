@@ -10,7 +10,7 @@ warnings.filterwarnings("ignore")
 
 
 # FOR TRAINING DATA
-def read_data(path="all_sales.csv"):
+def read_data(path="Data/all_sales.csv"):
     df = pd.read_csv(path, header=None)
     columns = ['id_factor', 'date', 'id_br', 'amount', 'id_gds', 'dsc_gds', 'gds_class', 'unit_price', 'id_client']
     df.columns = columns
@@ -36,7 +36,7 @@ def make_new_df(df):
     df['new_date'] = df['date'].apply(make_new_date)
     # Create data for 51338 branch (Bamland)
     df_branch = df[df['id_br'] == 51338]
-    df_branch = df_branch.groupby('new_date').sum()
+    df_branch = pd.DataFrame(df_branch['dsc_gds'].groupby(df_branch['new_date']).sum())
     df_branch['date'] = df_branch.index
     df_branch['year'] = df_branch['date'].apply(lambda x: x.split('-')[0])
     df_branch['month'] = df_branch['date'].apply(lambda x: x.split('-')[1])
@@ -74,7 +74,6 @@ def make_new_df(df):
     df_branch['کفش و صندل'] = df_branch['dsc_gds'].apply(lambda x: make_count(x, 'کفش و صندل'))
     df_branch['کلاه،هدبند،پاپوش'] = df_branch['dsc_gds'].apply(lambda x: make_count(x, 'کلاه،هدبند،پاپوش'))
     df_branch['کیف'] = df_branch['dsc_gds'].apply(lambda x: make_count(x, 'کیف'))
-    df_branch = df_branch.drop(['id_factor', 'amount', 'dsc_gds', 'id_gds', 'gds_class'], axis=1)
     return df_branch
 
 
@@ -85,25 +84,26 @@ def train_model(train_data):
     from sklearn.metrics import accuracy_score, precision_score
     import copy
 
-    new_data = copy.deepcopy(train_data[:-45])
+    new_data = copy.deepcopy(train_data)
     scaler = StandardScaler()
     X = new_data[['year', 'month', 'day']]
     X_scaled = scaler.fit_transform(X)
-    y = new_data.drop(['id_br', 'date', 'year', 'month', 'day'], axis=1)
+    y = new_data.drop(['id_br', 'date', 'year', 'month', 'day', 'dsc_gds'], axis=1)
 
     from sklearn.model_selection import train_test_split
     X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=1e-6, random_state=55)
-    X_valid = train_data[-45:-1][['year', 'month', 'day']]
-    X_valid = scaler.transform(X_valid)
-    y_valid = train_data[-45:-1].drop(['id_br', 'date', 'year', 'month', 'day'], axis=1)
+    # X_valid = train_data[-45:-1][['year', 'month', 'day']]
+    # X_valid = scaler.transform(X_valid)
+    # y_valid = train_data[-45:-1].drop(['id_br', 'date', 'year', 'month', 'day', 'dsc_gds'], axis=1)
 
     np.random.seed(42)
     # model_knr = KNeighborsRegressor(n_neighbors=9, weights='uniform', algorithm='auto', p=0.8)
+    # model_knr.fit(X_train, y_train)
     model_rfr = RandomForestRegressor(n_estimators=2000, criterion='absolute_error')
     model_rfr.fit(X_train, y_train)
 
     # make predictions
-    # preds = model_rfr.predict(X_valid).astype(int)
+    # preds = model_knr.predict(X_valid).astype(int)
 
 
     # Calculate Mean Absolute Error (MAE)
@@ -112,19 +112,24 @@ def train_model(train_data):
     return model_rfr, scaler
 
 
-df = read_data()
-df = make_new_df(df)
+# df = read_data()
+# DATA = make_new_df(df)
+# DATA = DATA.drop(['id_br', 'date', 'year', 'month', 'day', 'dsc_gds'], axis=1)
+# print(DATA.head())
 
-# model, scaler = train_model(df)
-# save the model to disk
-# filename_model = 'rfr_model.pkl'
-# file_name_scaler = 'scaler.pk'
+
+
 # l1 = ['اورآل', 'بادی', 'بارانی', 'بافت', 'بلوز', 'بلوز و شلوار کودک', 'بلوز کودک', 'تاپ',
 #       'تونیک', 'تی شرت', 'دامن', 'سارافون', 'سایر', 'ست بلوز و شلوار', 'سویی شرت', 'شال و روسری',
 #      'شلوار', 'شلوار کودک', 'شومیز', 'ماسک', 'مانتو', 'هودی کودک', 'پارچه', 'پالتو', 'پیراهن', 'ژاکت', 'کاپشن',
 #       'کت', 'کت شلوار', 'کفش و صندل', 'کلاه، هدبند، پاپوش', 'کیف']
-# pickle.dump(model, open(filename_model, 'wb'))
-# pickle.dump(scaler, open(file_name_scaler, 'wb'))
+
+# if __name__ == "__main__":
+#     model, scaler = train_model(DATA)
+#     filename_model = "./Models/rfr_model.pickle"
+#     filename_scaler = "./Models/rfr_scaler.pickle"
+#     pickle.dump(model, open(filename_model, 'wb'))
+#     pickle.dump(scaler, open(filename_scaler, 'wb'))
 
 # load the model from disk
 # loaded_model = pickle.load(open(filename_model, 'rb'))
