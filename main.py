@@ -2,23 +2,22 @@ import dash
 import numpy as np
 from dash import dcc, html
 from dash.dependencies import Input, Output, State
-# import plotly.express as px
 import plotly.graph_objs as go
 from utils import make_period_time
 import pickle
-from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
-
-# import dash_bootstrap_components as dbc
+import pandas as pd
+from data_preprocessing import read_data, make_new_df
 
 # Loading model and scaler
-FILE_NAME_MODEL = 'rfr_model.pkl'
-FILE_NAME_SCALER = 'scaler.pk'
+FILE_NAME_MODEL = 'Models/rfr_model.pickle'
+FILE_NAME_SCALER = 'Models/rfr_scaler.pickle'
 model = pickle.load(open(FILE_NAME_MODEL, 'rb'))
 scaler = pickle.load(open(FILE_NAME_SCALER, 'rb'))
 
-start_time = '1402- 1- 1'
-end_time = '1402- 2- 1'
+
+df = read_data()
+DATA = make_new_df(df)
 
 LABELS = ['اورآل', 'بادی', 'بارانی', 'بافت', 'بلوز', 'بلوز و شلوار کودک', 'بلوز کودک', 'تاپ',
           'تونیک', 'تی شرت', 'دامن', 'سارافون', 'سایر', 'ست بلوز و شلوار', 'سویی شرت', 'شال و روسری',
@@ -28,7 +27,7 @@ LABELS = ['اورآل', 'بادی', 'بارانی', 'بافت', 'بلوز', 'ب�
 # Define your custom color palette
 custom_palette = [
     '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
-    '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf',
+    '#8c564b', '#e377c2', '#ff00ff', '#bcbd22', '#17becf',
     '#aec7e8', '#ffbb78', '#98df8a', '#ff9896', '#c5b0d5',
     '#c49c94', '#f7b6d2', '#c7c7c7', '#dbdb8d', '#9edae5',
     '#393b79', '#637939', '#8c6d31', '#843c39', '#7b4173',
@@ -42,7 +41,7 @@ DAYS = [str(day).zfill(2) for day in range(1, 32)]
 
 
 # create a function that takes 2 datetimes and make sales prediction between this 2 times.
-def predict_period_time(start_date: str, end_date: str, model: RandomForestRegressor, scaler: StandardScaler):
+def predict_period_time(start_date: str, end_date: str, model, scaler):
     """
     :param start_date: the start date that you want to predict in the `str` format for example: '1402-03-01'
     :param end_date: the end date that you want to predict in the `str` format for example: '1402-04-01'
@@ -58,16 +57,30 @@ def predict_period_time(start_date: str, end_date: str, model: RandomForestRegre
     end_date = [int(x) for x in end_date]
 
     period_time = make_period_time(start_date, end_date)
-    inputs = scaler.transform(period_time)
-    predictions = model.predict(inputs)
+
+    start_year, start_month, start_day = period_time.iloc[0][['year', 'month', 'day']]
+    end_year, end_month, end_day = period_time.iloc[-1][['year', 'month', 'day']]
+
+    start_tarikh = pd.to_datetime('-'.join([str(start_year), str(start_month), str(start_day)]))
+    end_tarikh = pd.to_datetime('-'.join([str(end_year), str(end_month), str(end_day)]))
+    end_date_plus_1_days = end_tarikh + pd.Timedelta(days=1)
+    actual = DATA[(DATA['date'] >= str(start_tarikh)) & (DATA['date'] <= str(end_date_plus_1_days))].drop(
+        ['date', 'id_br', 'year', 'month', 'day', 'dsc_gds'], axis=1).values
+
+    total_actual = 0
+    for i in actual:
+        total_actual += i
+
+    input_features = scaler.transform(period_time)
+    predictions = model.predict(input_features)
     predictions += (0.13 * predictions).astype(int)
 
     total_predictions = 0
     for i in predictions:
         total_predictions += i
-    total_predictions += (0.13 * total_predictions)
+    total_predictions += (0.11 * total_predictions)
     total_predictions = np.round(total_predictions)
-    return total_predictions
+    return total_predictions, total_actual
 
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
@@ -174,26 +187,29 @@ def update_prediction_plot(n_clicks, start_year, start_month, start_day, end_yea
         # Combine the selected start date and end date into strings
         start_date = f"{start_year}-{start_month}-{start_day}"
         end_date = f"{end_year}-{end_month}-{end_day}"
-        # Convert the input strings to the appropriate format if needed
         # Call your sales prediction function with start_time and end_time
-        predictions = predict_period_time(start_date, end_date, model, scaler)
-
+        predictions, actual = predict_period_time(start_date, end_date, model, scaler)
         # Create a bar plot with the predictions
-        # Create a Plotly bar plot
-        fig = go.Figure(data=[go.Bar(x=LABELS, y=predictions, marker=dict(color=custom_palette))])
+        fig = go.Figure()
+        # Add a bar trace for predictions
+        fig.add_trace(go.Bar(x=LABELS, y=predictions, marker=dict(color=custom_palette), name='Predicted'))
+        # Add a bar trace for actual values
+        # fig.add_trace(go.Bar(x=LABELS, y=actual, marker=dict(color='rgba(128, 128, 128, 0.5)'), name='Actual', base=0))
+
         fig.update_layout(
-            height=600,
-            title="Sales Predictions of `Bamland` branch",
-            title_font=dict(size=20),
-            xaxis_title="Categories",
-            xaxis_title_font=dict(size=16),
-            yaxis_title="Counts",
-            yaxis_title_font=dict(size=16),
-            # font=dict(family="Arial", size=18, color="black"),
-            paper_bgcolor="white",
-            plot_bgcolor="rgba(221,235,241,0.7)",
-            xaxis=dict(tickangle=45, tickfont=dict(size=15), gridcolor='white'),
-        )
+                height=600,
+                title="Sales Predictions of `Bamland` branch",
+                title_font=dict(size=20),
+                xaxis_title="Categories",
+                xaxis_title_font=dict(size=16),
+                yaxis_title="Counts",
+                yaxis_title_font=dict(size=16),
+                # font=dict(family="Arial", size=18, color="black"),
+                paper_bgcolor="white",
+                plot_bgcolor="rgba(221,235,241,0.7)",
+                xaxis=dict(tickangle=45, tickfont=dict(size=15), gridcolor='white'),
+                barmode='overlay',
+            )
         # Change the theme to "plotly_dark"
         # fig.update_layout(template="plotly_dark") # for changing the background of plot
         return fig
